@@ -1,0 +1,1036 @@
+<!DOCTYPE html>
+<html lang="tr">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>⚡ Flashcard Uygulaması</title>
+
+    <link href="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/css/bootstrap.min.css" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+
+    <style>
+        /* Scroll kaymasını önleme */
+        html, body {
+            overflow-x: hidden;
+            max-width: 100%;
+            position: relative;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background-color: #f0f2f5;
+            min-height: 100vh;
+            padding-top: 50px;
+            touch-action: pan-y;
+        }
+
+        /* Flashcard Tasarımı */
+        .flashcard-container {
+            width: 90%;
+            max-width: 500px;
+            perspective: 1000px;
+            margin: 0 auto 30px;
+            position: relative;
+            overflow: hidden;
+        }
+
+        .card-inner {
+            position: relative;
+            width: 100%;
+            height: 350px;
+            transition: transform 0.8s;
+            transform-style: preserve-3d;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.15);
+            border-radius: 15px;
+            cursor: pointer;
+            -webkit-user-select: none;
+            user-select: none;
+            touch-action: none;
+        }
+
+        .flashcard-container.flipped .card-inner {
+            transform: rotateY(180deg);
+        }
+
+        .card-front,
+        .card-back {
+            position: absolute;
+            width: 100%;
+            height: 100%;
+            backface-visibility: hidden;
+            border-radius: 15px;
+            padding: 25px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            box-sizing: border-box;
+            text-align: center;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        .card-front {
+            background-color: #ffffff;
+            border: 4px solid #0d6efd;
+        }
+
+        .card-back {
+            background-color: #0d6efd;
+            color: #ffffff;
+            transform: rotateY(180deg);
+            text-align: left;
+            align-items: flex-start;
+            padding: 30px;
+        }
+
+        /* Ön Yüz Stilleri */
+        .front-title {
+            font-size: 2.5em;
+            font-weight: 700;
+            margin-bottom: 10px;
+            color: #333;
+        }
+
+        .front-context {
+            font-style: italic;
+            color: #6c757d;
+            padding: 10px;
+            border-top: 1px solid #eee;
+            font-size: 1.1em;
+        }
+
+        /* Arka Yüz Stilleri */
+        .back-section {
+            margin-bottom: 10px;
+            width: 100%;
+        }
+
+        .back-section strong {
+            display: block;
+            font-size: 0.9em;
+            color: #ffc107;
+            margin-bottom: 2px;
+        }
+
+        .back-user-sentence {
+            border-top: 1px solid rgba(255, 255, 255, 0.3);
+            padding-top: 10px;
+            margin-top: 15px;
+            font-style: italic;
+            font-size: 0.9em;
+        }
+
+        /* Kontrol Butonları (GİZLİ) */
+        .controls {
+            display: none !important;
+        }
+
+        /* İlerleme ve Bitiş Mesajı */
+        .progress-bar {
+            height: 12px;
+        }
+
+        .counter {
+            font-weight: 600;
+        }
+
+        .end-message {
+            background-color: #fff;
+            padding: 40px;
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.1);
+            display: none;
+            text-align: center;
+        }
+
+        .loading-message {
+            text-align: center;
+            font-size: 1.2em;
+            color: #6c757d;
+        }
+
+        /* Yeni Buton Konumu */
+        .action-buttons {
+            display: flex;
+            justify-content: center;
+            width: 90%;
+            max-width: 500px;
+            margin: 20px auto 0;
+            gap: 10px;
+        }
+
+        /* Swipe yön göstergeleri */
+        .swipe-hint {
+            position: absolute;
+            top: 50%;
+            transform: translateY(-50%);
+            padding: 8px 12px;
+            border-radius: 20px;
+            color: white;
+            font-weight: bold;
+            font-size: 12px;
+            opacity: 0;
+            transition: opacity 0.3s;
+            pointer-events: none;
+            z-index: 10;
+            white-space: nowrap;
+        }
+        
+        .swipe-left-hint {
+            left: -100px;
+            background-color: #dc3545;
+        }
+        
+        .swipe-right-hint {
+            right: -100px;
+            background-color: #28a745;
+        }
+        
+        .swipe-hint.active {
+            opacity: 1;
+        }
+
+        /* Modal güncelleme */
+        #modalMessage {
+            transition: all 0.3s ease;
+        }
+
+        /* Kayıt butonu animasyonu */
+        #saveCardButton:disabled {
+            opacity: 0.6;
+            cursor: not-allowed;
+        }
+
+        /* Telaffuz butonu - Kart üzerinde sağ üst köşe */
+        .pronunciation-btn {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            background-color: rgba(255, 255, 255, 0.9);
+            border: 2px solid #0d6efd;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            z-index: 20;
+            transition: all 0.3s;
+            box-shadow: 0 3px 10px rgba(0, 0, 0, 0.2);
+        }
+        
+        .pronunciation-btn:hover {
+            background-color: #0d6efd;
+            color: white;
+            transform: scale(1.1);
+        }
+        
+        .pronunciation-btn:active {
+            transform: scale(0.95);
+        }
+        
+        .pronunciation-btn .fa-spinner {
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+
+        /* Mobil için optimize */
+        @media (max-width: 576px) {
+            .card-inner {
+                height: 300px;
+            }
+            
+            .front-title {
+                font-size: 2em;
+            }
+            
+            .flashcard-container {
+                width: 95%;
+            }
+            
+            .action-buttons {
+                flex-direction: column;
+            }
+            
+            .action-buttons .btn {
+                width: 100%;
+                margin: 5px 0;
+            }
+            
+            .pronunciation-btn {
+                top: 10px;
+                right: 10px;
+                width: 35px;
+                height: 35px;
+            }
+        }
+    </style>
+
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-firestore.js"></script>
+</head>
+
+<body>
+
+    <div class="container pb-5">
+        <div class="header">
+            <h1 class="display-6 fw-bold text-center text-primary">⚡ Flashcard Uygulaması</h1>
+            <p class="text-center text-muted">Kartı çevirmek için tıkla, sağa/sola sürükleyerek işaretle</p>
+        </div>
+
+        <div id="loadingMessage" class="loading-message">
+            <i class="fas fa-spinner fa-spin me-2"></i> Kelimeler yükleniyor...
+        </div>
+
+        <!-- Swipe yön göstergeleri -->
+        <div class="swipe-hint swipe-left-hint" id="swipeLeftHint">
+            <i class="fas fa-arrow-left me-1"></i> Tekrar Et
+        </div>
+        <div class="swipe-hint swipe-right-hint" id="swipeRightHint">
+            Biliyorum <i class="fas fa-arrow-right ms-1"></i>
+        </div>
+
+        <div class="flashcard-container" id="flashcardContainer" style="display:none;">
+            <!-- Telaffuz butonu - KART ÜZERİNDE -->
+            <div class="pronunciation-btn" id="pronunciationBtn" style="display:none;">
+                <i class="fas fa-volume-up"></i>
+            </div>
+            
+            <div class="card-inner shadow">
+                <div class="card-front">
+                    <span class="position-absolute top-0 start-0 m-3 text-primary"><i
+                            class="fas fa-question-circle fa-2x"></i></span>
+                    <p class="front-title" id="frontTitle"></p>
+                    <p class="front-context" id="frontContext"></p>
+                    <small class="text-muted position-absolute bottom-0 mb-3">Çevirmek için tıkla</small>
+                </div>
+                <div class="card-back">
+                    <span class="position-absolute top-0 start-0 m-3 text-warning"><i
+                            class="fas fa-check-circle fa-2x"></i></span>
+                    <div class="back-section">
+                        <strong>Anlam (Türkçe):</strong>
+                        <span id="backMeaning"></span>
+                    </div>
+                    <div class="back-section">
+                        <strong>Kategori:</strong>
+                        <span id="backCategory"></span>
+                    </div>
+                    <div class="back-user-sentence">
+                        <strong>Örnek Cümle/Not:</strong> <span id="backUserSentence"></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Butonlar GİZLİ -->
+        <div class="controls" id="controls" style="display:none;">
+            <button class="control-btn btn-review" onclick="markCard(false)">
+                <i class="fas fa-arrow-left"></i> Tekrar Et
+            </button>
+            <button class="control-btn btn-know" onclick="markCard(true)">
+                Biliyorum <i class="fas fa-arrow-right"></i>
+            </button>
+        </div>
+        
+        <div class="action-buttons" id="actionButtons">
+            <button type="button" class="btn btn-warning" data-bs-toggle="modal" data-bs-target="#newCardModal">
+                <i class="fas fa-plus-circle me-2"></i> Yeni Kart Ekle
+            </button>
+            <button type="button" class="btn btn-info" onclick="location.reload()">
+                <i class="fas fa-redo me-2"></i> Yenile
+            </button>
+        </div>
+        <p class="text-muted text-center mt-3">M.Enes Yalçın Tarafından Yapılmıştır</p>
+
+        <div class="container" style="max-width: 500px;">
+            <div class="progress mb-2" style="height: 12px;">
+                <div class="progress-bar bg-primary" role="progressbar" id="progressFill" style="width: 0%;"
+                    aria-valuenow="0" aria-valuemin="0" aria-valuemax="100"></div>
+            </div>
+            <div class="counter text-center text-muted" id="counter">Kart 0 / 0 | Biliyorum: 0 | Tekrar: 0</div>
+        </div>
+
+        <div class="container">
+            <div class="end-message" id="endMessage">
+                <i class="fas fa-trophy text-success fa-3x mb-3"></i>
+                <h2 class="text-success">Harika! Tüm kartları tamamladınız.</h2>
+                <p class="lead">Tekrar sayısı: <span id="finalReviewCount"></span> / Bildiğiniz sayısı: <span
+                        id="finalKnownCount"></span></p>
+                <button class="btn btn-primary mt-3" onclick="location.reload()">Baştan Başla</button>
+            </div>
+        </div>
+    </div>
+    
+    <!-- Yeni Kart Modalı -->
+    <div class="modal fade" id="newCardModal" tabindex="-1" aria-labelledby="newCardModalLabel" aria-hidden="true">
+        <div class="modal-dialog">
+            <div class="modal-content">
+                <div class="modal-header bg-warning text-white">
+                    <h5 class="modal-title" id="newCardModalLabel"><i class="fas fa-plus-circle me-2"></i> Yeni Kelime Ekle</h5>
+                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+                </div>
+                <div class="modal-body">
+                    <form id="newCardForm">
+                        <div class="mb-3">
+                            <label for="ingilizceKelime" class="form-label">İngilizce Kelime *</label>
+                            <input type="text" class="form-control" id="ingilizceKelime" required autocomplete="off">
+                        </div>
+                        <div class="mb-3">
+                            <label for="turkceAnlam" class="form-label">Türkçe Anlam *</label>
+                            <input type="text" class="form-control" id="turkceAnlam" required autocomplete="off">
+                        </div>
+                        <div class="mb-3">
+                            <label for="kategori" class="form-label">Kategori (örnek: Fiiller, Günlük Hayat, İş)</label>
+                            <input type="text" class="form-control" id="kategori" autocomplete="off">
+                        </div>
+                        <div class="mb-3">
+                            <label for="ornekCumle" class="form-label">Örnek Cümle veya Not</label>
+                            <textarea class="form-control" id="ornekCumle" rows="2" autocomplete="off"></textarea>
+                        </div>
+                        <div id="modalMessage" class="alert d-none mt-3" role="alert"></div>
+                    </form>
+                </div>
+                <div class="modal-footer">
+                    <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">İptal</button>
+                    <button type="submit" form="newCardForm" class="btn btn-warning" id="saveCardButton">
+                        <span id="saveButtonText">Kaydet</span>
+                        <span id="saveButtonSpinner" class="spinner-border spinner-border-sm d-none ms-2" role="status"></span>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // 🔥 FIREBASE CONFIGURATION
+        const firebaseConfig = {
+            apiKey: "AIzaSyAexKjq-dkhfvi8_5bCz71YVRdcyV9AyKg",
+            authDomain: "webveritabanim.firebaseapp.com",
+            projectId: "webveritabanim",
+            storageBucket: "webveritabanim.firebasestorage.app",
+            messagingSenderId: "673890462728",
+            appId: "1:673890462728:web:185e1485795dce5807f5bd",
+        };
+
+        // Firebase'i Başlat
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.firestore();
+        const kelimelerRef = db.collection("IngilizceKelimeler");
+
+        // HTML Elementleri
+        const flashcardContainer = document.getElementById('flashcardContainer');
+        const cardInner = document.querySelector('.card-inner');
+        const loadingMessage = document.getElementById('loadingMessage');
+        const progressFill = document.getElementById('progressFill');
+        const counterElement = document.getElementById('counter');
+        const endMessage = document.getElementById('endMessage');
+        const finalKnownCount = document.getElementById('finalKnownCount');
+        const finalReviewCount = document.getElementById('finalReviewCount');
+        const swipeLeftHint = document.getElementById('swipeLeftHint');
+        const swipeRightHint = document.getElementById('swipeRightHint');
+        const pronunciationBtn = document.getElementById('pronunciationBtn');
+        
+        // Telaffuz için ses
+        let speechSynthesis = window.speechSynthesis;
+        let currentUtterance = null;
+
+        // Global değişkenler
+        let flashcards = [];
+        let currentCardIndex = 0;
+        let knownCount = 0;
+        let reviewCount = 0;
+        let totalCards = 0;
+        let currentEnglishWord = "";
+
+        // === TEMEL FONKSİYONLAR ===
+
+        // 1. Kartı Çevirme Fonksiyonu - GÜNCELLENDİ: Tıklama ile çalışır
+        function flipCard() {
+            if (totalCards === 0) return;
+            flashcardContainer.classList.toggle('flipped');
+            
+            // Kart çevrildiğinde telaffuz butonunu güncelle
+            updatePronunciationButton();
+        }
+
+        // 2. Kartı Ekrana Yükleme
+        function loadCard(index) {
+            if (index >= totalCards) {
+                showEndMessage();
+                return;
+            }
+
+            const card = flashcards[index];
+            currentEnglishWord = card.Ingilizce;
+
+            // Kartı sıfırla
+            flashcardContainer.classList.remove('flipped');
+            cardInner.style.transform = '';
+            cardInner.style.opacity = '1';
+            cardInner.style.backgroundColor = '';
+
+            // Ön Yüz
+            document.getElementById('frontTitle').textContent = card.Ingilizce;
+            document.getElementById('frontContext').textContent = `Kategori: ${card.Kategori || 'Belirtilmemiş'}`;
+
+            // Arka Yüz
+            document.getElementById('backMeaning').textContent = card.Turkce;
+            document.getElementById('backCategory').textContent = card.Kategori || 'Belirtilmemiş';
+            document.getElementById('backUserSentence').textContent = card.OrnekCumle || card.UserSentence || "Örnek cümle/not yok";
+
+            // Telaffuz butonunu göster
+            pronunciationBtn.style.display = 'flex';
+            
+            // Telaffuz butonunu güncelle
+            updatePronunciationButton();
+            
+            updateProgress();
+        }
+
+        // 3. İlerlemeyi Güncelle
+        function updateProgress() {
+            const percentage = (currentCardIndex / totalCards) * 100;
+            progressFill.style.width = `${percentage}%`;
+
+            const current = currentCardIndex + 1 > totalCards ? totalCards : currentCardIndex + 1;
+            counterElement.textContent = `Kart ${current} / ${totalCards} | Biliyorum: ${knownCount} | Tekrar: ${reviewCount}`;
+        }
+
+        // 4. Kartı İşaretleme (Sadece swipe ile)
+        async function markCard(isKnown) {
+            if (currentCardIndex >= totalCards) return;
+
+            const card = flashcards[currentCardIndex];
+            
+            // Animasyon
+            if (isKnown) {
+                knownCount++;
+            } else {
+                reviewCount++;
+            }
+
+            // Firebase güncelleme
+            try {
+                const dataToUpdate = {
+                    Ogrenildi: isKnown,
+                    SonTekrar: firebase.firestore.FieldValue.serverTimestamp()
+                };
+
+                await kelimelerRef.doc(card.FirebaseId).update(dataToUpdate);
+
+                // SQL MVC API güncelleme (varsa)
+                try {
+                    await fetch('/Ingilizce/OgrenildiGuncelle', {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({ 
+                            id: card.Id, 
+                            ogrenildi: isKnown 
+                        })
+                    });
+                } catch (apiError) {
+                    console.log("API güncellemesi atlandı:", apiError.message);
+                }
+
+            } catch (error) {
+                console.error("Güncelleme hatası:", error);
+            }
+
+            // Telaffuzu durdur
+            stopPronunciation();
+            
+            // Telaffuz butonunu gizle
+            pronunciationBtn.style.display = 'none';
+
+            // Bir sonraki karta geç
+            setTimeout(() => {
+                currentCardIndex++;
+                loadCard(currentCardIndex);
+            }, 300);
+        }
+
+        // 5. Bitiş Mesajı
+        function showEndMessage() {
+            flashcardContainer.style.display = 'none';
+            pronunciationBtn.style.display = 'none';
+            endMessage.style.display = 'block';
+            finalKnownCount.textContent = knownCount;
+            finalReviewCount.textContent = reviewCount;
+        }
+
+        // 6. Firebase'den TÜM kelimeleri çek (limit kaldırıldı)
+        async function fetchFlashcards() {
+            loadingMessage.style.display = 'block';
+            flashcardContainer.style.display = 'none';
+            pronunciationBtn.style.display = 'none';
+
+            try {
+                const snapshot = await kelimelerRef
+                    .orderBy('SonTekrar', 'desc')
+                    .get();
+
+                flashcards = snapshot.docs.map(doc => ({
+                    FirebaseId: doc.id,
+                    ...doc.data(),
+                    Id: doc.data().Id || 0,
+                    SonTekrar: doc.data().SonTekrar ? 
+                        (doc.data().SonTekrar.toDate ? doc.data().SonTekrar.toDate() : new Date(doc.data().SonTekrar)) : 
+                        null,
+                    EklenmeTarihi: doc.data().EklenmeTarihi ? 
+                        (doc.data().EklenmeTarihi.toDate ? doc.data().EklenmeTarihi.toDate() : new Date(doc.data().EklenmeTarihi)) : 
+                        new Date()
+                }));
+
+                totalCards = flashcards.length;
+                console.log(`${totalCards} kelime yüklendi`);
+
+                loadingMessage.style.display = 'none';
+                if (totalCards > 0) {
+                    flashcardContainer.style.display = 'block';
+                    loadCard(currentCardIndex);
+                } else {
+                    showEndMessage();
+                    endMessage.innerHTML = `
+                        <i class="fas fa-book-open text-info fa-3x mb-3"></i>
+                        <h2 class="text-info">Henüz kelime eklenmemiş</h2>
+                        <p class="lead">"Yeni Kart Ekle" butonuna tıklayarak ilk kelimenizi ekleyin!</p>
+                        <button class="btn btn-warning mt-3" data-bs-toggle="modal" data-bs-target="#newCardModal">
+                            <i class="fas fa-plus-circle me-2"></i> İlk Kelimeyi Ekle
+                        </button>
+                    `;
+                }
+
+            } catch (error) {
+                loadingMessage.innerHTML = `
+                    <div class="alert alert-danger">
+                        <i class="fas fa-exclamation-triangle me-2"></i>
+                        Veri yüklenirken hata: ${error.message}
+                    </div>
+                    <button class="btn btn-primary mt-2" onclick="location.reload()">
+                        <i class="fas fa-redo me-2"></i> Tekrar Dene
+                    </button>
+                `;
+                console.error("Veri çekme hatası:", error);
+            }
+        }
+
+        // === TELAFFUZ FONKSİYONLARI ===
+
+        function updatePronunciationButton() {
+            if (flashcardContainer.classList.contains('flipped')) {
+                pronunciationBtn.style.display = 'none';
+            } else {
+                pronunciationBtn.style.display = 'flex';
+                pronunciationBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                pronunciationBtn.title = 'Telaffuzunu dinle';
+            }
+        }
+
+        function speakEnglishWord() {
+            if (!currentEnglishWord) return;
+            
+            // Önceki konuşmayı durdur
+            stopPronunciation();
+            
+            // Eğer tarayıcı ses sentezleme desteklemiyorsa
+            if (!speechSynthesis) {
+                alert('Tarayıcınız ses sentezleme özelliğini desteklemiyor.');
+                return;
+            }
+
+            // Butonu yükleniyor durumuna getir
+            pronunciationBtn.innerHTML = '<i class="fas fa-spinner"></i>';
+            pronunciationBtn.style.cursor = 'wait';
+
+            // Yeni konuşma oluştur
+            currentUtterance = new SpeechSynthesisUtterance(currentEnglishWord);
+            currentUtterance.lang = 'en-US';
+            currentUtterance.rate = 0.8;
+            currentUtterance.pitch = 1;
+            currentUtterance.volume = 1;
+
+            // İngilizce ses bulmaya çalış
+            const voices = speechSynthesis.getVoices();
+            const englishVoice = voices.find(voice => 
+                voice.lang.startsWith('en-') || 
+                voice.lang.includes('US') || 
+                voice.lang.includes('UK')
+            );
+
+            if (englishVoice) {
+                currentUtterance.voice = englishVoice;
+            }
+
+            // Konuşma bittiğinde
+            currentUtterance.onend = function() {
+                pronunciationBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+                pronunciationBtn.style.cursor = 'pointer';
+                currentUtterance = null;
+            };
+
+
+            // Konuşmayı başlat
+            speechSynthesis.speak(currentUtterance);
+        }
+
+        function stopPronunciation() {
+            if (speechSynthesis && speechSynthesis.speaking) {
+                speechSynthesis.cancel();
+            }
+            if (currentUtterance) {
+                currentUtterance = null;
+            }
+            pronunciationBtn.innerHTML = '<i class="fas fa-volume-up"></i>';
+            pronunciationBtn.style.cursor = 'pointer';
+        }
+
+        // === SWIPE ANİMASYONU ===
+        // ... (Diğer tüm kodlar aynı kalır)
+
+// === SWIPE VE TIKLAMA MANTIĞI - GÜNCELLENDİ ===
+let startX = 0;
+let startY = 0;
+let currentX = 0;
+let isDragging = false;
+let isSwipe = false;
+let touchStartTime = 0;
+let touchStartX = 0;
+let touchStartY = 0;
+const threshold = 100;
+const rotationFactor = 0.1;
+const tapThreshold = 200; // 200ms'den kısa süreli basılı tutma "tap" sayılır
+const moveThreshold = 15; // 15px'den fazla hareket "swipe" sayılır
+const frontTitle = document.getElementById('frontTitle');
+const frontContext = document.getElementById('frontContext');
+
+// KARTIN HER YERİNDE TIKLAMA İLE ÇEVİRME
+cardInner.addEventListener('click', function(e) {
+    if (currentCardIndex >= totalCards) return;
+    
+    // Eğer bu bir swipe sonucu değilse (basit tıklamaysa) kartı çevir
+    if (!isSwipe) {
+        flipCard();
+    }
+    
+    // Tıklama işlemini durdur (telaffuz butonuna yayılmasın)
+    e.stopPropagation();
+});
+
+// KELİME VE KATEGORİ METİNLERİNE DE TIKLAMA EKLE
+frontTitle.addEventListener('click', function(e) {
+    if (currentCardIndex >= totalCards) return;
+    if (!isSwipe) {
+        flipCard();
+    }
+    e.stopPropagation();
+});
+
+frontContext.addEventListener('click', function(e) {
+    if (currentCardIndex >= totalCards) return;
+    if (!isSwipe) {
+        flipCard();
+    }
+    e.stopPropagation();
+});
+
+// Swipe için touch/mouse olayları
+cardInner.addEventListener('mousedown', startDrag);
+cardInner.addEventListener('touchstart', startDrag, { passive: false });
+
+document.addEventListener('mousemove', drag);
+document.addEventListener('touchmove', drag, { passive: false });
+
+document.addEventListener('mouseup', endDrag);
+document.addEventListener('touchend', endDrag);
+document.addEventListener('mouseleave', endDrag);
+document.addEventListener('touchcancel', endDrag);
+
+function startDrag(e) {
+    if (currentCardIndex >= totalCards) return;
+    
+    e.stopPropagation();
+    
+    isDragging = true;
+    isSwipe = false; // Başlangıçta swipe değil
+    touchStartTime = Date.now();
+    
+    startX = touchStartX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+    startY = touchStartY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+    
+    cardInner.style.transition = 'none';
+    cardInner.style.cursor = 'grabbing';
+    
+    // Göstergeleri gizle
+    swipeLeftHint.classList.remove('active');
+    swipeRightHint.classList.remove('active');
+}
+
+function drag(e) {
+    if (!isDragging) return;
+    
+    e.preventDefault();
+    e.stopPropagation();
+    
+    currentX = e.type.includes('mouse') ? e.clientX : e.touches[0].clientX;
+    const currentY = e.type.includes('mouse') ? e.clientY : e.touches[0].clientY;
+    
+    const deltaX = currentX - startX;
+    const deltaY = Math.abs(currentY - startY);
+    
+    // Eğer hareket eşiği aşıldıysa, bu bir swipe'tır
+    if (Math.abs(deltaX) > moveThreshold || Math.abs(currentY - touchStartY) > moveThreshold) {
+        isSwipe = true;
+    }
+    
+    // Sadece yatay hareket varsa kartı hareket ettir
+    if (Math.abs(deltaX) > Math.abs(deltaY)) {
+        cardInner.style.transform = `translateX(${deltaX}px) rotate(${deltaX * rotationFactor}deg)`;
+        
+        // Renk ve ipucu göstergeleri
+        if (deltaX > 50) {
+            cardInner.style.backgroundColor = 'rgba(40, 167, 69, 0.1)';
+            swipeRightHint.classList.add('active');
+            swipeRightHint.style.right = '10px';
+            swipeLeftHint.classList.remove('active');
+        } else if (deltaX < -50) {
+            cardInner.style.backgroundColor = 'rgba(220, 53, 69, 0.1)';
+            swipeLeftHint.classList.add('active');
+            swipeLeftHint.style.left = '10px';
+            swipeRightHint.classList.remove('active');
+        } else {
+            cardInner.style.backgroundColor = '';
+            swipeLeftHint.classList.remove('active');
+            swipeRightHint.classList.remove('active');
+        }
+    }
+}
+
+function endDrag(e) {
+    if (!isDragging) return;
+    
+    e.stopPropagation();
+    
+    isDragging = false;
+    cardInner.style.cursor = 'pointer';
+    cardInner.style.transition = 'transform 0.3s, opacity 0.3s';
+    
+    const deltaX = currentX - startX;
+    const touchDuration = Date.now() - touchStartTime;
+    
+    // Eğer kısa süreli (tap) ve az hareketliyse, bu bir tıklamadır
+    // Bu durumda click event'i zaten kartı çevirecek
+    if (touchDuration < tapThreshold && Math.abs(deltaX) < moveThreshold && !isSwipe) {
+        cardInner.style.transform = '';
+        cardInner.style.backgroundColor = '';
+        swipeLeftHint.classList.remove('active');
+        swipeRightHint.classList.remove('active');
+        return;
+    }
+    
+    // Eğer swipe değilse, kartı eski haline getir
+    if (!isSwipe) {
+        cardInner.style.transform = '';
+        cardInner.style.backgroundColor = '';
+        swipeLeftHint.classList.remove('active');
+        swipeRightHint.classList.remove('active');
+        return;
+    }
+    
+    // Swipe işlemi - eşik değerini kontrol et
+    if (Math.abs(deltaX) > threshold) {
+        if (deltaX > 0) {
+            // Sağa Swipe (Biliyorum)
+            cardInner.style.transform = 'translateX(600px) rotate(30deg)';
+            cardInner.style.opacity = '0';
+            setTimeout(() => markCard(true), 200);
+        } else {
+            // Sola Swipe (Tekrar Et)
+            cardInner.style.transform = 'translateX(-600px) rotate(-30deg)';
+            cardInner.style.opacity = '0';
+            setTimeout(() => markCard(false), 200);
+        }
+    } else {
+        // Yeterli sürüklenmediyse geri dön
+        cardInner.style.transform = '';
+        cardInner.style.backgroundColor = '';
+    }
+    
+    // Göstergeleri sıfırla
+    setTimeout(() => {
+        swipeLeftHint.classList.remove('active');
+        swipeRightHint.classList.remove('active');
+        swipeLeftHint.style.left = '-100px';
+        swipeRightHint.style.right = '-100px';
+        
+        // Swipe durumunu sıfırla (bir sonraki işlem için)
+        isSwipe = false;
+    }, 300);
+}
+
+// Telaffuz butonuna tıklama - kart çevrilmesini engelle
+pronunciationBtn.addEventListener('click', function(e) {
+    e.stopPropagation(); // Kartın çevrilmesini engelle
+    speakEnglishWord();
+});
+
+// Sayfa yüklendiğinde tüm tıklama alanlarını ayarla
+document.addEventListener('DOMContentLoaded', () => {
+    fetchFlashcards();
+    
+    // Kartın tüm tıklanabilir alanlarına işaretleyici ekle
+    const clickableElements = document.querySelectorAll('.card-front, .card-back, .front-title, .front-context');
+    clickableElements.forEach(element => {
+        element.style.cursor = 'pointer';
+    });
+    
+    // Scroll olayını engelle
+    document.addEventListener('scroll', function(e) {
+        if (isDragging) {
+            e.preventDefault();
+            e.stopPropagation();
+            return false;
+        }
+    }, { passive: false });
+});
+
+// ... (Diğer tüm kodlar aynı kalır)
+
+        // === YENİ KART EKLEME ===
+        document.addEventListener('DOMContentLoaded', () => {
+            const newCardForm = document.getElementById('newCardForm');
+            const modalMessage = document.getElementById('modalMessage');
+            const saveCardButton = document.getElementById('saveCardButton');
+            const saveButtonText = document.getElementById('saveButtonText');
+            const saveButtonSpinner = document.getElementById('saveButtonSpinner');
+            const newCardModal = new bootstrap.Modal(document.getElementById('newCardModal'));
+            
+            // Telaffuz butonuna tıklama
+            pronunciationBtn.addEventListener('click', function(e) {
+                e.stopPropagation(); // Kart çevrilmesini engelle
+                speakEnglishWord();
+            });
+            
+            // Form submit olayını dinle
+            newCardForm.addEventListener('submit', async (e) => {
+                e.preventDefault();
+                
+                const ingilizce = document.getElementById('ingilizceKelime').value.trim();
+                const turkce = document.getElementById('turkceAnlam').value.trim();
+                const kategori = document.getElementById('kategori').value.trim() || 'Genel';
+                const ornekCumle = document.getElementById('ornekCumle').value.trim() || '';
+                
+                if (!ingilizce || !turkce) {
+                    showMessage("Lütfen İngilizce kelime ve Türkçe anlamı giriniz.", 'alert-danger');
+                    return;
+                }
+                
+                saveCardButton.disabled = true;
+                saveButtonText.textContent = 'Kaydediliyor...';
+                saveButtonSpinner.classList.remove('d-none');
+                
+                const newWord = {
+                    Ingilizce: ingilizce,
+                    Turkce: turkce,
+                    Kategori: kategori,
+                    OrnekCumle: ornekCumle,
+                    Ogrenildi: false,
+                    EklenmeTarihi: firebase.firestore.FieldValue.serverTimestamp(),
+                    SonTekrar: firebase.firestore.FieldValue.serverTimestamp(),
+                    UserSentence: ornekCumle
+                };
+                
+                try {
+                    const docRef = await kelimelerRef.add(newWord);
+                    
+                    try {
+                        await fetch('/Ingilizce/Ekle', {
+                            method: 'POST',
+                            headers: { 'Content-Type': 'application/json' },
+                            body: JSON.stringify({
+                                ingilizce: ingilizce,
+                                turkce: turkce,
+                                kategori: kategori,
+                                userSentence: ornekCumle,
+                                firebaseDocumentId: docRef.id
+                            })
+                        });
+                    } catch (apiError) {
+                        console.log("API eklemesi atlandı:", apiError.message);
+                    }
+                    
+                    showMessage("✅ Kelime başarıyla eklendi! Otomatik yenilenecek...", 'alert-success');
+                    
+                    newCardForm.reset();
+                    
+                    setTimeout(() => {
+                        newCardModal.hide();
+                        setTimeout(() => {
+                            location.reload();
+                        }, 500);
+                    }, 1500);
+                    
+                } catch (error) {
+                    console.error("Kelime ekleme hatası:", error);
+                    showMessage("❌ Hata: " + error.message, 'alert-danger');
+                    
+                    saveCardButton.disabled = false;
+                    saveButtonText.textContent = 'Kaydet';
+                    saveButtonSpinner.classList.add('d-none');
+                }
+            });
+            
+            document.getElementById('newCardModal').addEventListener('hidden.bs.modal', function () {
+                newCardForm.reset();
+                modalMessage.classList.add('d-none');
+                modalMessage.textContent = '';
+                saveCardButton.disabled = false;
+                saveButtonText.textContent = 'Kaydet';
+                saveButtonSpinner.classList.add('d-none');
+            });
+            
+            newCardForm.addEventListener('keypress', function(e) {
+                if (e.key === 'Enter' && !e.shiftKey) {
+                    e.preventDefault();
+                    saveCardButton.click();
+                }
+            });
+        });
+        
+        function showMessage(message, type) {
+            const modalMessage = document.getElementById('modalMessage');
+            modalMessage.textContent = message;
+            modalMessage.className = `alert ${type} mt-3`;
+            modalMessage.classList.remove('d-none');
+        }
+
+        // === SAYFA YÜKLENDİĞİNDE ===
+        document.addEventListener('DOMContentLoaded', () => {
+            fetchFlashcards();
+            
+            cardInner.style.cursor = 'pointer';
+            
+            document.addEventListener('scroll', function(e) {
+                if (isDragging) {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    return false;
+                }
+            }, { passive: false });
+            
+            // Sayfa kapatılırken telaffuzu durdur
+            window.addEventListener('beforeunload', function() {
+                stopPronunciation();
+            });
+        });
+    </script>
+
+    <script src="https://cdn.jsdelivr.net/npm/bootstrap@5.3.2/dist/js/bootstrap.bundle.min.js"></script>
+</body>
+
+</html>
